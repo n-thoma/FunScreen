@@ -74,8 +74,8 @@ std::string GetExeDir()
 // ---------------------------------------------------------------------
 // Shared state between render loop and file-watcher thread
 // ---------------------------------------------------------------------
-static std::atomic<bool> g_reloadRequested{true}; // trigger initial load
-static std::atomic<bool> g_running{true};
+static std::atomic<bool> reloadRequested{true}; // trigger initial load
+static std::atomic<bool> running{true};
 
 static std::string ReadFile(const std::string& path, bool& ok)
 {
@@ -92,7 +92,7 @@ static std::string ReadFile(const std::string& path, bool& ok)
 void ShaderWatcherThread(const std::string& shaderPath)
 {
     FILETIME lastWrite = {};
-    while (g_running)
+    while (running)
     {
         WIN32_FILE_ATTRIBUTE_DATA data;
         if (GetFileAttributesExA(shaderPath.c_str(), GetFileExInfoStandard, &data))
@@ -103,7 +103,7 @@ void ShaderWatcherThread(const std::string& shaderPath)
 
                 // small debounce so we don't read a half-written file
                 std::this_thread::sleep_for(std::chrono::milliseconds(80));
-                g_reloadRequested = true;
+                reloadRequested = true;
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -121,14 +121,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             if (wParam == kHotkeyId)
             {
-                g_reloadRequested = true;
+                reloadRequested = true;
             }
 
             return 0;
         }
         case WM_DESTROY:
         {
-            g_running = false;
+            running = false;
             PostQuitMessage(0);
 
             return 0;
@@ -330,17 +330,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int)
     // ------------------------------------------------------------------------
 
     MSG msg;
-    while (g_running)
+    while (running)
     {
         while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
-            if (msg.message == WM_QUIT) g_running = false;
+            if (msg.message == WM_QUIT) running = false;
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
 
         // If hotkey is pressed or file changes
-        if (g_reloadRequested.exchange(false))
+        if (reloadRequested.exchange(false))
         {
             // If the file is valid and readable
             bool ok;
